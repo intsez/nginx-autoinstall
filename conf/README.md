@@ -1,15 +1,15 @@
 # Configurations files
-- [PageSpeed](./README.md#PageSpeed)
-- [Brotli](./README.md#Brotli)
-- [LibreSSL / OpenSSL 1.1+](./README.md#LibreSSL)
-- [TLS 1.3](./README.md#TLS)
-- [GeoIP 2](./README.md#GeoIP-2)
-- [HTTP/3](./README.md#HTTP/3)
-- [Testcookie](./README.md#Testcookie)
-- [NAXSI](./README.md#NAXSI)
+- [PageSpeed](#PageSpeed)
+- [Brotli](#Brotli)
+- [LibreSSL / OpenSSL 1.1+](#LibreSL-OpenSSL)
+- [TLS 1.3](#TLS)
+- [GeoIP 2](#GeoIP2)
+- [HTTP/3](HTTP3)
+- [Testcookie](#Testcookie)
+- [NAXSI](md#NAXSI)
 
 
-
+<a name="PageSpeed"></a>
 ## PageSpeed
 
 Add this in your http block:
@@ -28,7 +28,7 @@ pagespeed FileCachePath /var/ngx_pagespeed_cache;
 ```
 
 More info here : https://angristan.fr/compiler-installer-nginx-module-pagespeed-debian/
-
+<a name="Brotli"></a>
 ## Brotli
 
 Add this in your http block :
@@ -40,8 +40,8 @@ brotli_buffers 16 8k;
 brotli_comp_level 6;
 brotli_types *;
 ```
-
-## LibreSSL / OpenSSL 1.1+
+<a name="LibreSL-OpenSSL"></a>
+## LibreSSL / OpenSSL 1.1+ 
 
 You can now use ChaCha20 in addition to AES. Add this in your server block:
 
@@ -54,7 +54,7 @@ You can also use more secure curves :
 ```nginx
 ssl_ecdh_curve X25519:P-521:P-384:P-256;
 ```
-
+<a name="TLS"></a>
 ## TLS 1.3
 
 TLS 1.3 needs special ciphers.
@@ -65,11 +65,11 @@ ssl_ciphers TLS-CHACHA20-POLY1305-SHA256:TLS-AES-256-GCM-SHA384:TLS-AES-128-GCM-
 ```
 
 TLS- can be TLS13-.
-
+<a name="GeoIP2"></a>
 ## GeoIP 2
 
 See https://github.com/leev/ngx_http_geoip2_module#example-usage
-
+<a name="HTTP3"></a>
 ## HTTP/3
 
 See https://github.com/cloudflare/quiche/tree/master/extras/nginx#readme
@@ -92,7 +92,7 @@ server {
     add_header alt-svc 'h3-23=":443"; ma=86400';
 }
 ```
-
+<a name="Testcookie"></a>
 ## Testcookie
 
 Example configuration in nginx.conf:
@@ -163,7 +163,7 @@ Which turns off the html part.
 
 See https://github.com/kyprizel/testcookie-nginx-module#testcookie_redirect_via_refresh
 
-
+<a name="NAXSI"></a>
 ## NAXSI 
 
 To enable NAXSI for all virtual hosts, add an entry to the 'http block' in 'nginx.conf' file:
