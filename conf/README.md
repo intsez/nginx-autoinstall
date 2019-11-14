@@ -4,9 +4,9 @@
 - [LibreSSL / OpenSSL 1.1+](#LibreSL-OpenSSL)
 - [TLS 1.3](#TLS)
 - [GeoIP 2](#GeoIP2)
-- [HTTP/3](HTTP3)
+- [HTTP/3](#HTTP3)
 - [Testcookie](#Testcookie)
-- [NAXSI](md#NAXSI)
+- [NAXSI](#NAXSI)
 
 
 <a name="PageSpeed"></a>
