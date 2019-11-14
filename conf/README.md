@@ -200,4 +200,4 @@ server {
 ...
 }
 ```
-Form more information check: https://github.com/nbs-system/naxsi/wiki
+For more information check: https://github.com/nbs-system/naxsi/wiki
