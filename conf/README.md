@@ -211,7 +211,6 @@ server {
 }
 ```
 **How to test NAXSI ?**
-
 To test NAXSI, disable "#LearningMode" in virtual host configuration file by adding "#":
 ```nginx
 server {
