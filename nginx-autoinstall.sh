@@ -6,7 +6,7 @@ if [[ "$EUID" -ne 0 ]]; then
 fi
 
 # Define versions
-NGINX_MAINLINE_VER=1.17.4
+NGINX_MAINLINE_VER=1.17.5
 NGINX_STABLE_VER=1.16.1
 LIBRESSL_VER=2.9.2
 OPENSSL_VER=1.1.1d
@@ -17,6 +17,7 @@ GEOIP2_VER=3.3
 LUA_JIT_VER=2.1-20181029
 LUA_NGINX_VER=0.10.14rc2
 NGINX_DEV_KIT=0.3.0
+NAXSI_VER=0.56
 
 # Define installation paramaters for headless install (fallback if unspecifed)
 if [[ "$HEADLESS" == "y" ]]; then
@@ -33,6 +34,7 @@ if [[ "$HEADLESS" == "y" ]]; then
 	VTS=${VTS:-n}
 	TESTCOOKIE=${TESTCOOKIE:-n}
 	HTTP3=${HTTP3:-n}
+	NAXSI=${NAXSI:-n}
 	MODSEC=${MODSEC:-n}
 	SSL=${SSL:-1}
 	RM_CONF=${RM_CONF:-y}
@@ -102,7 +104,7 @@ case $OPTION in
 				read -p "       Headers More $HEADERMOD_VER [y/n]: " -e HEADERMOD
 			done
 			while [[ $GEOIP != "y" && $GEOIP != "n" ]]; do
-				read -p "       GeoIP [y/n]: " -e GEOIP
+				read -p "       GeoIP $GEOIP2_VER [y/n] : " -e GEOIP
 			done
 			while [[ $FANCYINDEX != "y" && $FANCYINDEX != "n" ]]; do
 				read -p "       Fancy index [y/n]: " -e FANCYINDEX
@@ -124,6 +126,9 @@ case $OPTION in
 			done
 			while [[ $HTTP3 != "y" && $HTTP3 != "n" ]]; do
 				read -p "       HTTP/3 (by Cloudflare, WILL INSTALL BoringSSL, Quiche, Rust and Go) [y/n]: " -e HTTP3
+			done
+			while [[ $NAXSI != "y" && $NAXSI != "n" ]]; do
+				read -p "       NAXSI $NAXSI_VER [y/n]: " -e NAXSI
 			done
 			while [[ $MODSEC != "y" && $MODSEC != "n" ]]; do
 				read -p "       nginx ModSecurity [y/n]: " -e MODSEC
@@ -189,7 +194,7 @@ case $OPTION in
 			tar -xzvf "$(basename "${psol_url}")"
 		fi
 
-		#Brotli
+		# Brotli
 		if [[ "$BROTLI" = 'y' ]]; then
 			cd /usr/local/src/nginx/modules || exit 1
 			git clone https://github.com/eustas/ngx_brotli
@@ -242,9 +247,9 @@ case $OPTION in
 		fi
 
 		# Lua
-		if [[ "$LUA" = 'y' ]]; then	
-			# LuaJIT download		
-			cd /usr/local/src/nginx/modules						
+		if [[ "$LUA" = 'y' ]]; then
+			# LuaJIT download
+			cd /usr/local/src/nginx/modules
 			wget https://github.com/openresty/luajit2/archive/v${LUA_JIT_VER}.tar.gz
 			tar xaf v${LUA_JIT_VER}.tar.gz
 			cd luajit2-${LUA_JIT_VER}
@@ -252,12 +257,12 @@ case $OPTION in
 			make install
 
 			# ngx_devel_kit download
-			cd /usr/local/src/nginx/modules									
+			cd /usr/local/src/nginx/modules
 			wget https://github.com/simplresty/ngx_devel_kit/archive/v${NGINX_DEV_KIT}.tar.gz
 			tar xaf v${NGINX_DEV_KIT}.tar.gz
 
 			# lua-nginx-module download
-			cd /usr/local/src/nginx/modules			
+			cd /usr/local/src/nginx/modules
 			wget https://github.com/openresty/lua-nginx-module/archive/v${LUA_NGINX_VER}.tar.gz
 			tar xaf v${LUA_NGINX_VER}.tar.gz
 
@@ -287,6 +292,12 @@ case $OPTION in
 			cd openssl-${OPENSSL_VER}
 
 			./config
+		fi
+
+		# NAXSI
+		if [[ "$NAXSI" = 'y' ]]; then
+			cd /usr/local/src/nginx/modules || exit 1
+			git clone https://github.com/nbs-system/naxsi.git
 		fi
 
 		# ModSecurity
@@ -351,7 +362,7 @@ case $OPTION in
 		--with-http_sub_module"
 
 		# Optional options
-		if [[ "$LUA" = 'y' ]]; then	
+		if [[ "$LUA" = 'y' ]]; then
 			NGINX_OPTIONS=$(echo $NGINX_OPTIONS; echo --with-ld-opt="-Wl,-rpath,/usr/local/lib/")
 		fi
 
@@ -410,6 +421,10 @@ case $OPTION in
 			NGINX_MODULES=$(echo "$NGINX_MODULES"; echo --add-module=/usr/local/src/nginx/modules/testcookie-nginx-module)
 		fi
 
+		if [[ "$NAXSI" = 'y' ]]; then
+			NGINX_MODULES=$(echo $NGINX_MODULES; echo "--add-module=/usr/local/src/nginx/modules/naxsi/naxsi_src")
+		fi
+
 		if [[ "$MODSEC" = 'y' ]]; then
 			git clone --quiet https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/nginx/modules/ModSecurity-nginx
 			NGINX_MODULES=$(echo "$NGINX_MODULES"; echo --add-module=/usr/local/src/nginx/modules/ModSecurity-nginx)
@@ -433,7 +448,7 @@ case $OPTION in
 			NGINX_MODULES=$(echo "$NGINX_MODULES"; echo --with-http_v3_module)
 		fi
 
-		if [[ "$LUA" = 'y' ]]; then	
+		if [[ "$LUA" = 'y' ]]; then
 			export LUAJIT_LIB=/usr/local/lib/
  			export LUAJIT_INC=/usr/local/include/luajit-2.1/
 		fi
@@ -475,6 +490,71 @@ case $OPTION in
 			mkdir -p /etc/nginx/conf.d
 		fi
 
+		# Configuration files for NAXSI
+		if [[ "$NAXSI" = 'y' ]]; then
+			if [[ ! -d /etc/nginx/modules/naxsi ]]; then
+				mkdir -p /etc/nginx/modules/naxsi
+			fi
+			cd /etc/nginx/modules/naxsi || exit 1
+			wget https://raw.githubusercontent.com/nbs-system/naxsi/master/naxsi_config/naxsi_core.rules
+		# Backup of default.conf if exists
+			if [[ ! -f /etc/nginx/sites-available/default.conf ]]; then
+				mv /etc/nginx/sites-available/default.conf /etc/nginx/sites-available/default.$(date +%d-%m-%y-%H:%M)
+			fi
+			cd /etc/nginx/sites-available || exit 1
+		# Download default cofiguration files for HTML and WorPress with Naxsi rules included
+			wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/conf/deflt_naxsi.conf
+			mv /etc/nginx/sites-available/deflt_naxsi.conf /etc/nginx/sites-available/default.conf
+			wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/conf/wp_naxsi.conf
+
+		# Add entry to nginx.conf naxsi core rules for any virtual host (line 12)
+			sed -i '12 i \# NAXSI_core_rules\ninclude modules/naxsi/naxsi_core.rules;\n ' /etc/nginx/nginx.conf
+		# Move nxapi tool to /etc/nginx/modules/naxsi before cleaning up
+			mv /usr/local/src/nginx/modules/naxsi/nxapi/ /etc/nginx/modules/naxsi
+			echo
+			echo "Nxapi tool saved in /etc/nginx/modules/naxsi/"
+			echo "Configuration files for virtual hosts saved in /etc/nginx/sites-available"
+			echo
+
+		# Info how to test Naxsi
+			echo -e "To test NAXSI, disable \"#LearningMode\" in virtual host configuration file\nand while tailing error logs on the web server:\n\n\ttail -f /var/log/nginx/error.log\n\ncopy and paste these or similar commands into terminal:\n\n\t\$ curl 'http://your_server_ip/?q=\"><script>alert(0)</script>'\n\t\$ curl'http://your_server_ip/?q=1\" or \"1\"=\"1\"' "
+			echo
+		# fail2ban integration
+			while [[ $NAXSI_F2B != "y" && $NAXSI_F2B != "n" ]]; do
+				read -p "Integrate NAXSI with fail2ban [y/n]?: " -e NAXSI_F2B
+			done
+				echo
+			if [[ "$NAXSI_F2B" = 'y' ]]; then
+				if [[ ! -d /etc/fail2ban ]]; then
+					echo
+					echo "It looks like the fail2ban is not installed, please wait installing..."
+					apt update; apt install fail2ban -y
+				fi
+				cd /etc/fail2ban/filter.d || exit 1
+				wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/conf/f2b-naxsi.conf
+				echo -e "\n[f2b-naxsi]\nenabled = true\nport = http,https\nfilter = f2b-naxsi\nlogpath = /var/lognginx/*error.log\nmaxretry = 3" >> /etc/fail2ban/jail.local
+				echo
+				/etc/init.d/fail2ban restart
+				echo
+			fi
+		# Additional rules for NAXSI
+			while [[ $NAXSI_RULES != "y" && $NAXSI_RULES != "n" ]]; do
+				echo -e "You can find full list of naxsi rules provided and maintained by the community at:\nhttps://github.com/nbs-system/naxsi-rules"
+				echo
+				read -p "Download additional rules for Naxsi (Wordpress, Drupal, Dokuwiki, etc.)[y/n]: " -e NAXSI_RULES
+			done
+				echo
+			if [[ "$NAXSI_RULES" = 'y' ]]; then
+				cd /etc/nginx/modules/naxsi || exit 1
+				git clone https://github.com/nbs-system/naxsi-rules.git
+				if [ $? -eq 0 ]; then
+					echo
+					echo "Rules cloned to /etc/nginx/modules/naxsi/naxsi-rules"
+				else
+					echo "Download failed"
+				fi
+			fi
+		fi
 		# Restart Nginx
 		systemctl restart nginx
 
@@ -490,15 +570,17 @@ case $OPTION in
 
 		# We're done !
 		echo "Installation done."
+		echo
 	exit
 	;;
+
 	2) # Uninstall Nginx
 		if [[ "$HEADLESS" != "y" ]]; then
 			while [[ $RM_CONF !=  "y" && $RM_CONF != "n" ]]; do
-				read -p "       Remove configuration files ? [y/n]: " -e RM_CONF
+				read -p "      Remove configuration files ? [y/n]: " -e RM_CONF
 			done
 			while [[ $RM_LOGS !=  "y" && $RM_LOGS != "n" ]]; do
-				read -p "       Remove logs files ? [y/n]: " -e RM_LOGS
+				read -p "      Remove logs files ? [y/n]: " -e RM_LOGS
 			done
 		fi
 		# Stop Nginx
@@ -531,14 +613,15 @@ case $OPTION in
 		fi
 
 		# We're done !
+		echo
 		echo "Uninstallation done."
-
+		echo
 		exit
 	;;
 	3) # Update the script
 		wget https://raw.githubusercontent.com/Angristan/nginx-autoinstall/master/nginx-autoinstall.sh -O nginx-autoinstall.sh
 		chmod +x nginx-autoinstall.sh
-		echo ""
+		echo
 		echo "Update done."
 		sleep 2
 		./nginx-autoinstall.sh
