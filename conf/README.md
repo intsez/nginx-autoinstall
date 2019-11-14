@@ -1,4 +1,14 @@
 # Configurations files
+- [PageSpeed](./README.md#PageSpeed)
+- [Brotli](./README.md#Brotli)
+- [LibreSSL / OpenSSL 1.1+](./README.md#LibreSSL-/-OpenSSL-1.1+)
+- [TLS 1.3](./README.md#TLS-1.3)
+- [GeoIP 2](./README.md#GeoIP-2)
+- [HTTP/3](./README.md#HTTP/3)
+- [Testcookie](./README.md#Testcookie)
+- [NAXSI](./README.md#NAXSI)
+
+
 
 ## PageSpeed
 
@@ -154,25 +164,25 @@ Which turns off the html part.
 See https://github.com/kyprizel/testcookie-nginx-module#testcookie_redirect_via_refresh
 
 
-## NAXSI (Nginx Anti XSS & SQL Injection).
+## NAXSI 
 
-Add an entry to the http block in nginx.conf file, to enable NAXSI rules for all virtual hosts:
+To enable NAXSI for all virtual hosts, add an entry to the 'http block' in 'nginx.conf' file:
 
-```
+```nginx
 http {
 ...
 # NAXSI_core_rules
-include modules/naxsi/naxsi_core.rules; 
+	include modules/naxsi/naxsi_core.rules; 
 ...
 }
 ```
-Add the entry to the root location in the virtual host server block:
-```
+Next add the entry to the 'root location' in the virtual host 'server block':
+```nginx
 server {
-...
+..
 	location / {
 		try_files $uri $uri/ =404;
-    	
+    	...
 	# e.g. rules for WordPress
 	    include modules/naxsi/naxsi-rules/wordpress.rules;
 	
@@ -190,7 +200,7 @@ server {
 	    CheckRule "$UPLOAD >= 5" BLOCK;
 	    CheckRule "$XSS >= 8" BLOCK;
 	    error_log /var/log/nginx/error.log;
-...
+	...
 	}
 	
 	location /RequestDenied {
@@ -200,4 +210,26 @@ server {
 ...
 }
 ```
+**How to test NAXSI ?**
+
+To test NAXSI, disable "#LearningMode" in virtual host configuration file by adding "#":
+```nginx
+server {
+...
+	# enable/disable learning mode
+     #     LearningMode;
+...
+}
+
+```
+And while tailing error logs on the web server:
+```sh
+# tail -f /var/log/nginx/error.log
+```
+copy then paste one of these or similar commands to the terminal. Don't forget to enter your server's correct IP address
+```sh
+$ curl 'http://your_server_ip/?q="><script>alert(0)</script>'
+$ curl 'http://localhost/?q=1" or "1"="1"' 
+```
+
 For more information check: https://github.com/nbs-system/naxsi/wiki
