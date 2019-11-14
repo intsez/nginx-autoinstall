@@ -152,3 +152,52 @@ testcookie_redirect_via_refresh off;
 Which turns off the html part.
 
 See https://github.com/kyprizel/testcookie-nginx-module#testcookie_redirect_via_refresh
+
+
+## NAXSI (Nginx Anti XSS & SQL Injection).
+
+Add an entry to the http block in nginx.conf file, to enable NAXSI rules for all virtual hosts:
+
+```
+http {
+...
+# NAXSI_core_rules
+include modules/naxsi/naxsi_core.rules; 
+...
+}
+```
+Add the entry to the root location in the virtual host server block:
+```
+server {
+...
+	location / {
+		try_files $uri $uri/ =404;
+    	
+	# e.g. rules for WordPress
+	    include modules/naxsi/naxsi-rules/wordpress.rules;
+	
+	# enable/disable Naxsi
+	    SecRulesEnabled;
+	# enable/disable learning mode
+	    LearningMode;
+	    
+	    LibInjectionSql; #enable libinjection support for SQLI
+	    LibInjectionXss; #enable libinjection support for XSS
+	    DeniedUrl "/RequestDenied"; #the location where naxsi will redirect the request when it is blocked
+	    CheckRule "$SQL >= 8" BLOCK; #the action to take when the $SQL score is superior or equal to 8
+	    CheckRule "$RFI >= 8" BLOCK;
+	    CheckRule "$TRAVERSAL >= 5" BLOCK;
+	    CheckRule "$UPLOAD >= 5" BLOCK;
+	    CheckRule "$XSS >= 8" BLOCK;
+	    error_log /var/log/nginx/error.log;
+...
+	}
+	
+	location /RequestDenied {
+    		internal;
+    		return 403;
+  	}
+...
+}
+```
+Form more information check: https://github.com/nbs-system/naxsi/wiki
