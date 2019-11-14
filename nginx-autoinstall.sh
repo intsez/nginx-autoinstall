@@ -511,13 +511,15 @@ case $OPTION in
 			sed -i '12 i \# NAXSI_core_rules\ninclude modules/naxsi/naxsi_core.rules;\n ' /etc/nginx/nginx.conf
 		# Move nxapi tool to /etc/nginx/modules/naxsi before cleaning up
 			mv /usr/local/src/nginx/modules/naxsi/nxapi/ /etc/nginx/modules/naxsi
+			ln -s /etc/nginx/sites-available/default.conf /etc/nginx/sites-enabled/
 			echo
 			echo "Nxapi tool saved in /etc/nginx/modules/naxsi/"
 			echo "Configuration files for virtual hosts saved in /etc/nginx/sites-available"
+			echo "Symbolic link to default HTML conf file created in /etc/nginx/sites-enabled/"
 			echo
 
 		# Info how to test Naxsi
-			echo -e "To test NAXSI, disable \"#LearningMode\" in virtual host configuration file\nand while tailing error logs on the web server:\n\n\ttail -f /var/log/nginx/error.log\n\ncopy and paste these or similar commands into terminal:\n\n\t\$ curl 'http://your_server_ip/?q=\"><script>alert(0)</script>'\n\t\$ curl'http://your_server_ip/?q=1\" or \"1\"=\"1\"' "
+			echo -e "To test NAXSI, disable \"#LearningMode\" in virtual host configuration file\nand while tailing error logs on the web server:\n\n\ttail -f /var/log/nginx/error.log\n\ncopy and paste these or similar commands into terminal:\n\n\t\$ curl 'http://your_server_ip/?q=\"><script>alert(0)</script>'\n\t\$ curl 'http://your_server_ip/?q=1\" or \"1\"=\"1\"' "
 			echo
 		# fail2ban integration
 			while [[ $NAXSI_F2B != "y" && $NAXSI_F2B != "n" ]]; do
@@ -539,7 +541,7 @@ case $OPTION in
 			fi
 		# Additional rules for NAXSI
 			while [[ $NAXSI_RULES != "y" && $NAXSI_RULES != "n" ]]; do
-				echo -e "You can find full list of naxsi rules provided and maintained by the community at:\nhttps://github.com/nbs-system/naxsi-rules"
+				echo -e "You can find full list of Naxsi rules provided and maintained by the community at:\nhttps://github.com/nbs-system/naxsi-rules"
 				echo
 				read -p "Download additional rules for Naxsi (Wordpress, Drupal, Dokuwiki, etc.)[y/n]: " -e NAXSI_RULES
 			done
