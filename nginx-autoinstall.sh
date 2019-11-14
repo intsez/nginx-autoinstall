@@ -453,6 +453,76 @@ case $OPTION in
  			export LUAJIT_INC=/usr/local/include/luajit-2.1/
 		fi
 
+		# Configuration for NAXSI
+		if [[ "$NAXSI" = 'y' ]]; then
+		        if [[ ! -d /etc/nginx/modules/naxsi ]]; then
+		                mkdir -p /etc/nginx/modules/naxsi
+		        fi
+		        cd /etc/nginx/modules/naxsi || exit 1
+		        wget https://raw.githubusercontent.com/nbs-system/naxsi/master/naxsi_config/naxsi_core.rules
+		# Backup of default.conf if exists
+		        if [[ -e /etc/nginx/sites-available/default.conf ]]; then
+		                mv /etc/nginx/sites-available/default.conf /etc/nginx/sites-available/default.$(date +%d-%m-%y-%H:%M)
+		        fi
+		        cd /etc/nginx/sites-available || exit 1
+		# Download default cofiguration files for HTML and WorPress with Naxsi rules included
+		        wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/conf/deflt_naxsi.conf
+		        mv /etc/nginx/sites-available/deflt_naxsi.conf /etc/nginx/sites-available/default.conf
+		        wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/conf/wp_naxsi.conf
+
+		# Add entry to nginx.conf to enable NAXSI for any virtual host (#12)
+		        sed -i '12 i \# NAXSI_core_rules\ninclude modules/naxsi/naxsi_core.rules;\n ' /etc/nginx/nginx.conf
+		# Move nxapi tool to /etc/nginx/modules/naxsi before cleaning up
+		        mv /usr/local/src/nginx/modules/naxsi/nxapi/ /etc/nginx/modules/naxsi
+		# Make symbolic link
+		        # ln -s /etc/nginx/sites-available/default.conf /etc/nginx/sites-enabled/
+		        echo ""
+		        echo "Nxapi tool saved in /etc/nginx/modules/naxsi/"
+		        echo "Configuration files for virtual hosts saved in /etc/nginx/sites-available"
+		        # echo "Symbolic link to default HTML conf file created in /etc/nginx/sites-enabled/"
+		        echo ""
+
+		# Info how to test Naxsi
+		        echo -e "To test NAXSI, disable \"#LearningMode\" in virtual host configuration file\nand while tailing error logs on the web server:\n\n\ttail -f /var/log/nginx/error.log\n\ncopy and paste these or similar commands into terminal:\n\n\t\$ curl 'http://your_server_ip/?q=\"><script>alert(0)</script>'\n\t\$ curl 'http://your_server_ip/?q=1\" or \"1\"=\"1\"' "
+		        echo ""
+		# fail2ban integration
+		        while [[ $NAXSI_F2B != "y" && $NAXSI_F2B != "n" ]]; do
+		                read -p "Integrate NAXSI with fail2ban [y/n]?: " -e NAXSI_F2B
+		        done
+		                echo ""
+		        if [[ "$NAXSI_F2B" = 'y' ]]; then
+		                if [[ ! -d /etc/fail2ban ]]; then
+		                        echo ""
+		                        echo "It looks like the fail2ban is not installed, please wait installing..."
+					echo ""
+		                        apt update; apt install fail2ban -y
+		                fi
+		                cd /etc/fail2ban/filter.d || exit 1
+		                wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/conf/f2b-naxsi.conf
+		                echo -e "\n[f2b-naxsi]\nenabled = true\nport = http,https\nfilter = f2b-naxsi\nlogpath = /var/lognginx/*error.log\nmaxretry = 3" >> /etc/fail2ban/jail.local
+		                echo ""
+		                /etc/init.d/fail2ban restart
+		                echo ""
+		        fi
+		# Additional rules for NAXSI
+		        while [[ $NAXSI_RULES != "y" && $NAXSI_RULES != "n" ]]; do
+		                echo -e "You can find full list of Naxsi rules provided and maintained by the community at:\nhttps://github.com/nbs-system/naxsi-rules"
+		                echo ""
+		                read -p "Download additional rules for Naxsi (Wordpress, Drupal, Dokuwiki, etc.)[y/n]: " -e NAXSI_RULES
+		        done
+		                echo ""
+		        if [[ "$NAXSI_RULES" = 'y' ]]; then
+		                cd /etc/nginx/modules/naxsi || exit 1
+		                git clone https://github.com/nbs-system/naxsi-rules.git
+		                if [ $? -eq 0 ]; then
+		                        echo ""
+		                        echo "Rules cloned to /etc/nginx/modules/naxsi/naxsi-rules"
+		                else
+		                        echo "Download failed"
+		                fi
+		        fi
+		fi
+
 		./configure $NGINX_OPTIONS $NGINX_MODULES
 		make -j "$(nproc)"
 		make install
@@ -490,73 +560,6 @@ case $OPTION in
 			mkdir -p /etc/nginx/conf.d
 		fi
 
-		# Configuration files for NAXSI
-		if [[ "$NAXSI" = 'y' ]]; then
-			if [[ ! -d /etc/nginx/modules/naxsi ]]; then
-				mkdir -p /etc/nginx/modules/naxsi
-			fi
-			cd /etc/nginx/modules/naxsi || exit 1
-			wget https://raw.githubusercontent.com/nbs-system/naxsi/master/naxsi_config/naxsi_core.rules
-		# Backup of default.conf if exists
-			if [[ ! -e /etc/nginx/sites-available/default.conf ]]; then
-				mv /etc/nginx/sites-available/default.conf /etc/nginx/sites-available/default.$(date +%d-%m-%y-%H:%M)
-			fi
-			cd /etc/nginx/sites-available || exit 1
-		# Download default cofiguration files for HTML and WorPress with Naxsi rules included
-			wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/conf/deflt_naxsi.conf
-			mv /etc/nginx/sites-available/deflt_naxsi.conf /etc/nginx/sites-available/default.conf
-			wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/conf/wp_naxsi.conf
-
-		# Add entry to nginx.conf naxsi core rules for any virtual host (#12)
-			sed -i '12 i \# NAXSI_core_rules\ninclude modules/naxsi/naxsi_core.rules;\n ' /etc/nginx/nginx.conf
-		# Move nxapi tool to /etc/nginx/modules/naxsi before cleaning up
-			mv /usr/local/src/nginx/modules/naxsi/nxapi/ /etc/nginx/modules/naxsi
-			ln -s /etc/nginx/sites-available/default.conf /etc/nginx/sites-enabled/
-			echo ""
-			echo "Nxapi tool saved in /etc/nginx/modules/naxsi/"
-			echo "Configuration files for virtual hosts saved in /etc/nginx/sites-available"
-			echo "Symbolic link to default HTML conf file created in /etc/nginx/sites-enabled/"
-			echo ""
-
-		# Info how to test Naxsi
-			echo -e "To test NAXSI, disable \"#LearningMode\" in virtual host configuration file\nand while tailing error logs on the web server:\n\n\ttail -f /var/log/nginx/error.log\n\ncopy and paste these or similar commands into terminal:\n\n\t\$ curl 'http://your_server_ip/?q=\"><script>alert(0)</script>'\n\t\$ curl 'http://your_server_ip/?q=1\" or \"1\"=\"1\"' "
-			echo
-		# fail2ban integration
-			while [[ $NAXSI_F2B != "y" && $NAXSI_F2B != "n" ]]; do
-				read -p "Integrate NAXSI with fail2ban [y/n]?: " -e NAXSI_F2B
-			done
-				echo
-			if [[ "$NAXSI_F2B" = 'y' ]]; then
-				if [[ ! -d /etc/fail2ban ]]; then
-					echo ""
-					echo "It looks like the fail2ban is not installed, please wait installing..."
-					apt update; apt install fail2ban -y
-				fi
-				cd /etc/fail2ban/filter.d || exit 1
-				wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/conf/f2b-naxsi.conf
-				echo -e "\n[f2b-naxsi]\nenabled = true\nport = http,https\nfilter = f2b-naxsi\nlogpath = /var/lognginx/*error.log\nmaxretry = 3" >> /etc/fail2ban/jail.local
-				echo ""
-				/etc/init.d/fail2ban restart
-				echo ""
-			fi
-		# Additional rules for NAXSI
-			while [[ $NAXSI_RULES != "y" && $NAXSI_RULES != "n" ]]; do
-				echo -e "You can find full list of Naxsi rules provided and maintained by the community at:\nhttps://github.com/nbs-system/naxsi-rules"
-				echo ""
-				read -p "Download additional rules for Naxsi (Wordpress, Drupal, Dokuwiki, etc.)[y/n]: " -e NAXSI_RULES
-			done
-				echo ""
-			if [[ "$NAXSI_RULES" = 'y' ]]; then
-				cd /etc/nginx/modules/naxsi || exit 1
-				git clone https://github.com/nbs-system/naxsi-rules.git
-				if [ $? -eq 0 ]; then
-					echo ""
-					echo "Rules cloned to /etc/nginx/modules/naxsi/naxsi-rules"
-				else
-					echo "Download failed"
-				fi
-			fi
-		fi
 		# Restart Nginx
 		systemctl restart nginx
 
@@ -571,11 +574,11 @@ case $OPTION in
 		rm -r /usr/local/src/nginx
 
 		# We're done !
+		echo ""
 		echo "Installation done."
-		echo
+		echo ""
 	exit
 	;;
-
 	2) # Uninstall Nginx
 		if [[ "$HEADLESS" != "y" ]]; then
 			while [[ $RM_CONF !=  "y" && $RM_CONF != "n" ]]; do
