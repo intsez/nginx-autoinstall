@@ -1,8 +1,8 @@
 # Configurations files
 - [PageSpeed](./README.md#PageSpeed)
 - [Brotli](./README.md#Brotli)
-- [LibreSSL / OpenSSL 1.1+](./README.md#LibreSSL-/-OpenSSL-1.1+)
-- [TLS 1.3](./README.md#TLS-1.3)
+- [LibreSSL / OpenSSL 1.1+](./README.md#LibreSSL)
+- [TLS 1.3](./README.md#TLS)
 - [GeoIP 2](./README.md#GeoIP-2)
 - [HTTP/3](./README.md#HTTP/3)
 - [Testcookie](./README.md#Testcookie)
