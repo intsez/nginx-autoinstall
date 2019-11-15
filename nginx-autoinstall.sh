@@ -1,4 +1,4 @@
-#!/bin/bash
+``#!/bin/bash
 
 if [[ "$EUID" -ne 0 ]]; then
 	echo -e "Sorry, you need to run this as root"
@@ -129,6 +129,9 @@ case $OPTION in
 			done
 			while [[ $NAXSI != "y" && $NAXSI != "n" ]]; do
 				read -p "       NAXSI $NAXSI_VER [y/n]: " -e NAXSI
+			done
+			while [[ $NAXSI_F2B != "y" ]]; do
+				read -p "       Integrate NAXSI with fail2ban [y/n]?: " -e NAXSI_F2B
 			done
 			while [[ $MODSEC != "y" && $MODSEC != "n" ]]; do
 				read -p "       nginx ModSecurity [y/n]: " -e MODSEC
@@ -294,51 +297,6 @@ case $OPTION in
 			./config
 		fi
 
-		# NAXSI
-		if [[ "$NAXSI" = 'y' ]]; then
-                        while [[ $NAXSI_F2B != "y" ]]; do
-                                read -p "Integrate NAXSI with fail2ban [y/n]?: " -e NAXSI_F2B
-                        done
-                        if [[ "$NAXSI_F2B" = 'y' ]]; then
-                                if [[ ! -d /etc/fail2ban ]]; then
-                                        echo ""
-                                        echo "It looks like the fail2ban is not installed, please wait installing..."
-                                        echo ""
-                                        apt update; apt install fail2ban -y
-                                fi
-                                if [[ ! -e /etc/fail2ban/filter.d/f2b-naxsi.conf ]]; then
-                                        cd /etc/fail2ban/filter.d || exit 1
-                                        wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/conf/f2b-naxsi.conf
-                                        echo -e "\n[f2b-naxsi]\nenabled = true\nport = http,https\nfilter = f2b-naxsi\nlogpath = /var/lognginx/*error.log\nmaxretry = 3" >> /etc/fail2ban/jail.local
-                                        echo ""
-                                        # fail2ban restart
-                                        /etc/init.d/fail2ban restart
-                                        echo ""
-                                fi
-                        fi
-
-                        if [[ ! -d /etc/nginx/modules/naxsi ]]; then
-                                mkdir -p /etc/nginx/modules/naxsi
-                        fi
-
-                        cd /usr/local/src/nginx/modules || exit 1
-                        git clone https://github.com/nbs-system/naxsi.git
-                        # Community rules for NAXSI -> https://github.com/nbs-system/naxsi-rules
-                        cd /etc/nginx/modules/naxsi || exit 1
-                        git clone https://github.com/nbs-system/naxsi-rules.git
-                                        if [ $? -eq 0 ]; then
-                                                echo ""
-                                                echo "NAXSI rules saved in /etc/nginx/modules/naxsi/naxsi-rules"
-                                        else
-                                                echo "NAXSI rules download failed."
-                                        fi
-                        # NAXSI core rules
-			cd /etc/nginx/modules/naxsi/naxsi-rules || exit 1
-                        wget https://raw.githubusercontent.com/nbs-system/naxsi/master/naxsi_config/naxsi_core.rules
-                        # Move nxapi tool before cleaning up
-                        mv /usr/local/src/nginx/modules/naxsi/nxapi/ /etc/nginx/modules/naxsi
-                fi
-
 		# ModSecurity
 		if [[ "$MODSEC" = 'y' ]]; then
 			cd /usr/local/src/nginx/modules || exit 1
@@ -406,11 +364,7 @@ case $OPTION in
 		fi
 
 		# Optional modules
-                if [[ "$NAXSI" = 'y' ]]; then
-                        NGINX_MODULES=$(echo $NGINX_MODULES; echo "--add-module=/usr/local/src/nginx/modules/naxsi/naxsi_src")
-                fi
-
-                if [[ "$LIBRESSL" = 'y' ]]; then
+		if [[ "$LIBRESSL" = 'y' ]]; then
 			NGINX_MODULES=$(echo "$NGINX_MODULES"; echo --with-openssl=/usr/local/src/nginx/modules/libressl-${LIBRESSL_VER})
 		fi
 
@@ -529,6 +483,64 @@ case $OPTION in
 			mkdir -p /etc/nginx/conf.d
 		fi
 
+		# Add NAXSI as dynamic module
+		if [[ "$NAXSI" = 'y' ]]; then
+			if [[ "$NAXSI_F2B" = 'y' ]]; then
+				if [[ ! -d /etc/fail2ban ]]; then
+					echo ""
+					echo "It looks like the fail2ban is not installed, please wait installing..."
+					echo ""
+					apt update; apt install fail2ban -y
+				fi
+				if [[ ! -e /etc/fail2ban/filter.d/f2b-naxsi.conf ]]; then
+					cd /etc/fail2ban/filter.d || exit 1
+					wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/conf/f2b-naxsi.conf
+					echo -e "\n[f2b-naxsi]\nenabled = true\nport = http,https\nfilter = f2b-naxsi\nlogpath = /var/lognginx/*error.log\nmaxretry = 3" >> /etc/fail2ban/jail.local
+					echo ""
+					# fail2ban restart
+					/etc/init.d/fail2ban restart
+					echo ""
+				fi
+			fi
+
+			if [[ ! -d /etc/nginx/modules/naxsi ]]; then
+				mkdir -p /etc/nginx/modules/naxsi
+			fi
+
+			cd /usr/local/src/nginx/modules || exit 1
+			git clone https://github.com/nbs-system/naxsi.git
+
+			# Community rules for NAXSI -> https://github.com/nbs-system/naxsi-rules
+			cd /etc/nginx/modules/naxsi || exit 1
+			git clone https://github.com/nbs-system/naxsi-rules.git
+			# NAXSI core rules
+			cd /etc/nginx/modules/naxsi/naxsi-rules || exit 1
+			wget https://raw.githubusercontent.com/nbs-system/naxsi/master/naxsi_config/naxsi_core.rules
+			# Move nxapi tool before cleaning up
+			mv /usr/local/src/nginx/modules/naxsi/nxapi/ /etc/nginx/modules/naxsi
+
+			cd /usr/local/src/nginx/nginx-${NGINX_VER} || exit 1
+			./configure $NGINX_OPTIONS $NGINX_MODULES --add-dynamic-module=/usr/local/src/nginx/modules/naxsi/naxsi_src
+			# install gcc version 7 to avoid errors such as: "‘strncat’ specified bound 1 equals source length [-Werror=stringop-overflow=] strncat((char*)tmp_hashname.data, "#", 1"
+			if [[ $(lsb_release -si) == "Debian" ]] || [[ $(lsb_release -si) == "Ubuntu" ]]
+			then
+				if [[ $(gcc -dumpversion) == "8" ]]
+				then
+					apt install gcc-7 -y
+					make CC=gcc-7 modules
+			        fi
+
+			else
+				make modules
+			fi
+			# copy NAXSI module before cleaning up
+			cp /usr/local/src/nginx/nginx-${NGINX_VER}/objs/ngx_http_naxsi_module.so /etc/nginx/modules/naxsi
+			# laod NAXSI module
+			sed -i '1 i\#Load naxsi\nload_module modules/naxsi/ngx_http_naxsi_module.so;\n' /etc/nginx/nginx.conf
+			echo ""
+			echo "Additional rules for NAXSI saved in /etc/nginx/modules/naxsi/naxsi-rules"
+		fi
+
 		# Restart Nginx
 		systemctl restart nginx
 
@@ -540,7 +552,7 @@ case $OPTION in
 		fi
 
 		# Removing temporary Nginx and modules files
-		rm -r /usr/local/src/nginx
+		# rm -r /usr/local/src/nginx
 
 		# We're done !
 		echo ""
