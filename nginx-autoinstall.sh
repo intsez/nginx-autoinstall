@@ -127,14 +127,14 @@ case $OPTION in
 			while [[ $HTTP3 != "y" && $HTTP3 != "n" ]]; do
 				read -p "       HTTP/3 (by Cloudflare, WILL INSTALL BoringSSL, Quiche, Rust and Go) [y/n]: " -e HTTP3
 			done
-			while [[ $MODSEC != "y" && $MODSEC != "n" ]]; do
-				read -p "       nginx ModSecurity [y/n]: " -e MODSEC
-			done
 			while [[ $NAXSI != "y" && $NAXSI != "n" ]]; do
 				read -p "       NAXSI $NAXSI_VER [y/n]: " -e NAXSI
 			done
 			while [[ $NAXSI_F2B != "y" ]]; do
 				read -p "       Integrate NAXSI with fail2ban [y/n]?: " -e NAXSI_F2B
+			done
+			while [[ $MODSEC != "y" && $MODSEC != "n" ]]; do
+				read -p "       nginx ModSecurity [y/n]: " -e MODSEC
 			done
 			if [[ "$MODSEC" = 'y' ]]; then
 				read -p "       Enable nginx ModSecurity? [y/n]: " -e MODSEC_ENABLE
