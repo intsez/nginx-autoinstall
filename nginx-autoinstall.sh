@@ -104,7 +104,7 @@ case $OPTION in
 				read -p "       Headers More $HEADERMOD_VER [y/n]: " -e HEADERMOD
 			done
 			while [[ $GEOIP != "y" && $GEOIP != "n" ]]; do
-				read -p "       GeoIP $GEOIP2_VER [y/n] : " -e GEOIP
+				read -p "       GeoIP [y/n]: " -e GEOIP
 			done
 			while [[ $FANCYINDEX != "y" && $FANCYINDEX != "n" ]]; do
 				read -p "       Fancy index [y/n]: " -e FANCYINDEX
@@ -127,14 +127,14 @@ case $OPTION in
 			while [[ $HTTP3 != "y" && $HTTP3 != "n" ]]; do
 				read -p "       HTTP/3 (by Cloudflare, WILL INSTALL BoringSSL, Quiche, Rust and Go) [y/n]: " -e HTTP3
 			done
+			while [[ $MODSEC != "y" && $MODSEC != "n" ]]; do
+				read -p "       nginx ModSecurity [y/n]: " -e MODSEC
+			done
 			while [[ $NAXSI != "y" && $NAXSI != "n" ]]; do
 				read -p "       NAXSI $NAXSI_VER [y/n]: " -e NAXSI
 			done
 			while [[ $NAXSI_F2B != "y" ]]; do
 				read -p "       Integrate NAXSI with fail2ban [y/n]?: " -e NAXSI_F2B
-			done
-			while [[ $MODSEC != "y" && $MODSEC != "n" ]]; do
-				read -p "       nginx ModSecurity [y/n]: " -e MODSEC
 			done
 			if [[ "$MODSEC" = 'y' ]]; then
 				read -p "       Enable nginx ModSecurity? [y/n]: " -e MODSEC_ENABLE
@@ -197,7 +197,7 @@ case $OPTION in
 			tar -xzvf "$(basename "${psol_url}")"
 		fi
 
-		# Brotli
+		#Brotli
 		if [[ "$BROTLI" = 'y' ]]; then
 			cd /usr/local/src/nginx/modules || exit 1
 			git clone https://github.com/eustas/ngx_brotli
@@ -376,6 +376,10 @@ case $OPTION in
 			NGINX_MODULES=$(echo "$NGINX_MODULES"; echo "--add-module=/usr/local/src/nginx/modules/ngx_brotli")
 		fi
 
+		if [[ "$HEADERMOD" = 'y' ]]; then
+			NGINX_MODULES=$(echo "$NGINX_MODULES"; echo "--add-module=/usr/local/src/nginx/modules/headers-more-nginx-module-${HEADERMOD_VER}")
+		fi
+
 		if [[ "$GEOIP" = 'y' ]]; then
 			NGINX_MODULES=$(echo "$NGINX_MODULES"; echo "--add-module=/usr/local/src/nginx/modules/ngx_http_geoip2_module-${GEOIP2_VER}")
 		fi
@@ -446,6 +450,64 @@ case $OPTION in
 		make -j "$(nproc)"
 		make install
 
+		# Add NAXSI as dynamic module
+		if [[ "$NAXSI" = 'y' ]]; then
+			if [[ "$NAXSI_F2B" = 'y' ]]; then
+				if [[ ! -d /etc/fail2ban ]]; then
+					echo ""
+					echo "It looks like the fail2ban is not installed, please wait installing..."
+					echo ""
+					apt update; apt install fail2ban -y
+				fi
+				if [[ ! -e /etc/fail2ban/filter.d/f2b-naxsi.conf ]]; then
+					cd /etc/fail2ban/filter.d || exit 1
+					wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/conf/f2b-naxsi.conf
+					echo -e "\n[f2b-naxsi]\nenabled = true\nport = http,https\nfilter = f2b-naxsi\nlogpath = /var/lognginx/*error.log\nmaxretry = 3" >> /etc/fail2ban/jail.local
+					echo ""
+					# fail2ban restart
+					/etc/init.d/fail2ban restart
+					echo ""
+				fi
+			fi
+		
+			if [[ ! -d /etc/nginx/modules/naxsi ]]; then
+				mkdir -p /etc/nginx/modules/naxsi
+			fi
+		
+			cd /usr/local/src/nginx/modules || exit 1
+			git clone https://github.com/nbs-system/naxsi.git
+		
+			# Community rules for NAXSI -> https://github.com/nbs-system/naxsi-rules
+			cd /etc/nginx/modules/naxsi || exit 1
+			git clone https://github.com/nbs-system/naxsi-rules.git
+			# NAXSI core rules
+			cd /etc/nginx/modules/naxsi/naxsi-rules || exit 1
+			wget https://raw.githubusercontent.com/nbs-system/naxsi/master/naxsi_config/naxsi_core.rules
+			# Move nxapi tool before cleaning up
+			mv /usr/local/src/nginx/modules/naxsi/nxapi/ /etc/nginx/modules/naxsi
+		
+			cd /usr/local/src/nginx/nginx-${NGINX_VER} || exit 1
+			./configure $NGINX_OPTIONS $NGINX_MODULES --add-dynamic-module=/usr/local/src/nginx/modules/naxsi/naxsi_src
+			# install gcc version 7 to avoid errors such as: ‘strncat’ specified bound 1 equals source length [-Werror=stringop-overflow=] strncat((char*)tmp_hashname.data, # 1"
+			if [[ $(lsb_release -si) == "Raspbian" ]] || [[ $(lsb_release -si) == "Debian" ]] || [[ $(lsb_release -si) == "Ubuntu" ]]
+			then
+				if [[ $(gcc -dumpversion) == "8" ]]
+				then
+					apt install gcc-7 -y
+					make CC=gcc-7 modules
+				fi
+		
+			else
+				make modules
+			fi
+			# copy NAXSI module before cleaning up
+			cp /usr/local/src/nginx/nginx-${NGINX_VER}/objs/ngx_http_naxsi_module.so /etc/nginx/modules/naxsi
+			# laod NAXSI module
+			sed -i '1 i\#Load naxsi\nload_module modules/naxsi/ngx_http_naxsi_module.so;\n' /etc/nginx/nginx.conf
+			echo ""
+			echo "Additional rules for NAXSI saved in /etc/nginx/modules/naxsi/naxsi-rules"
+		fi
+
 		# remove debugging symbols
 		strip -s /usr/sbin/nginx
 
@@ -479,106 +541,30 @@ case $OPTION in
 			mkdir -p /etc/nginx/conf.d
 		fi
 
-		# Add HEADERMOD as dynamic module
-		if [[ "$HEADERMOD" = 'y' ]]; then
-			if [[ ! -d /etc/nginx/modules/headermod ]]; then
-				mkdir -p /etc/nginx/modules/headermod
-			fi
-
-			cd /usr/local/src/nginx/nginx-${NGINX_VER} || exit 1
-			./configure $NGINX_OPTIONS $NGINX_MODULES --add-dynamic-module=/usr/local/src/nginx/modules/headers-more-nginx-module-${HEADERMOD_VER}
-				make modules
-			# copy Headersmod before cleaning up
-			cp /usr/local/src/nginx/nginx-${NGINX_VER}/objs/ngx_http_headers_more_filter_module.so /etc/nginx/modules/headermod
-			# laod HEADERMOD module
-			sed -i '1 i\#Load Headersmod\nload_module modules/headermod/ngx_http_headers_more_filter_module.so;\n' /etc/nginx/nginx.conf
-			echo ""
-		fi
-
-		# Add NAXSI as dynamic module
-		if [[ "$NAXSI" = 'y' ]]; then
-			if [[ "$NAXSI_F2B" = 'y' ]]; then
-				if [[ ! -d /etc/fail2ban ]]; then
-					echo ""
-					echo "It looks like the fail2ban is not installed, please wait installing..."
-					echo ""
-					apt update; apt install fail2ban -y
-				fi
-				if [[ ! -e /etc/fail2ban/filter.d/f2b-naxsi.conf ]]; then
-					cd /etc/fail2ban/filter.d || exit 1
-					wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/conf/f2b-naxsi.conf
-					echo -e "\n[f2b-naxsi]\nenabled = true\nport = http,https\nfilter = f2b-naxsi\nlogpath = /var/lognginx/*error.log\nmaxretry = 3" >> /etc/fail2ban/jail.local
-					echo ""
-					# fail2ban restart
-					/etc/init.d/fail2ban restart
-					echo ""
-				fi
-			fi
-
-			if [[ ! -d /etc/nginx/modules/naxsi ]]; then
-				mkdir -p /etc/nginx/modules/naxsi
-			fi
-
-			cd /usr/local/src/nginx/modules || exit 1
-			git clone https://github.com/nbs-system/naxsi.git
-
-			# Community rules for NAXSI -> https://github.com/nbs-system/naxsi-rules
-			cd /etc/nginx/modules/naxsi || exit 1
-			git clone https://github.com/nbs-system/naxsi-rules.git
-			# NAXSI core rules
-			cd /etc/nginx/modules/naxsi/naxsi-rules || exit 1
-			wget https://raw.githubusercontent.com/nbs-system/naxsi/master/naxsi_config/naxsi_core.rules
-			# Move nxapi tool before cleaning up
-			mv /usr/local/src/nginx/modules/naxsi/nxapi/ /etc/nginx/modules/naxsi
-
-			cd /usr/local/src/nginx/nginx-${NGINX_VER} || exit 1
-			./configure $NGINX_OPTIONS $NGINX_MODULES --add-dynamic-module=/usr/local/src/nginx/modules/naxsi/naxsi_src
-			# install gcc version 7 to avoid errors such as: ‘strncat’ specified bound 1 equals source length [-Werror=stringop-overflow=] strncat((char*)tmp_hashname.data, # 1"
-			if [[ $(lsb_release -si) == "Raspbian" ]] || [[ $(lsb_release -si) == "Debian" ]] || [[ $(lsb_release -si) == "Ubuntu" ]]
-			then
-				if [[ $(gcc -dumpversion) == "8" ]]
-				then
-					apt install gcc-7 -y
-					make CC=gcc-7 modules
-			        fi
-
-			else
-				make modules
-			fi
-			# copy NAXSI module before cleaning up
-			cp /usr/local/src/nginx/nginx-${NGINX_VER}/objs/ngx_http_naxsi_module.so /etc/nginx/modules/naxsi
-			# laod NAXSI module
-			sed -i '1 i\#Load naxsi\nload_module modules/naxsi/ngx_http_naxsi_module.so;\n' /etc/nginx/nginx.conf
-			echo ""
-			echo "Additional rules for NAXSI saved in /etc/nginx/modules/naxsi/naxsi-rules"
-		fi
-
 		# Restart Nginx
 		systemctl restart nginx
 
 		# Block Nginx from being installed via APT
-		if [[ $(lsb_release -si) == "Raspbian" ]] || [[ $(lsb_release -si) == "Ubuntu" ]]
+		if [[ $(lsb_release -si) == "Debian" ]] || [[ $(lsb_release -si) == "Ubuntu" ]]
 		then
 			cd /etc/apt/preferences.d/ || exit 1
 			echo -e "Package: nginx*\\nPin: release *\\nPin-Priority: -1" > nginx-block
 		fi
 
 		# Removing temporary Nginx and modules files
-		# rm -r /usr/local/src/nginx
+		rm -r /usr/local/src/nginx
 
 		# We're done !
-		echo ""
 		echo "Installation done."
-		echo ""
 	exit
 	;;
 	2) # Uninstall Nginx
 		if [[ "$HEADLESS" != "y" ]]; then
 			while [[ $RM_CONF !=  "y" && $RM_CONF != "n" ]]; do
-				read -p "      Remove configuration files ? [y/n]: " -e RM_CONF
+				read -p "       Remove configuration files ? [y/n]: " -e RM_CONF
 			done
 			while [[ $RM_LOGS !=  "y" && $RM_LOGS != "n" ]]; do
-				read -p "      Remove logs files ? [y/n]: " -e RM_LOGS
+				read -p "       Remove logs files ? [y/n]: " -e RM_LOGS
 			done
 		fi
 		# Stop Nginx
@@ -611,9 +597,8 @@ case $OPTION in
 		fi
 
 		# We're done !
-		echo ""
 		echo "Uninstallation done."
-		echo ""
+
 		exit
 	;;
 	3) # Update the script
@@ -716,4 +701,3 @@ case $OPTION in
 	;;
 
 esac
-
