@@ -15,9 +15,9 @@ Compile and install Nginx from source with optional modules.
 * Latest mainline or stable version, from source
 * Optional modules (see below)
 * Removed useless modules
-* [Custom nginx.conf](https://github.com/Angristan/nginx-autoinstall/blob/master/conf/nginx.conf) (default does not work)
-* [Init script for systemd](https://github.com/Angristan/nginx-autoinstall/blob/master/conf/nginx.service) (not provided by default)
-* [Logrotate conf](https://github.com/Angristan/nginx-autoinstall/blob/master/conf/nginx-logrotate) (not provided by default)
+* [Custom nginx.conf](https://github.com/intsez/nginx-autoinstall/blob/master/conf/nginx.conf) (default does not work)
+* [Init script for systemd](https://github.com/intsez/nginx-autoinstall/blob/master/conf/nginx.service) (not provided by default)
+* [Logrotate conf](https://github.com/intsez/nginx-autoinstall/blob/master/conf/nginx-logrotate) (not provided by default)
 * Block Nginx installation from APT using pinning, to prevent conflicts
 
 ### Optional modules/features
@@ -48,12 +48,12 @@ Compile and install Nginx from source with optional modules.
 Just download and execute the script :
 
 ```sh
-wget https://raw.githubusercontent.com/Angristan/nginx-autoinstall/master/nginx-autoinstall.sh
+wget https://raw.githubusercontent.com/intsez/nginx-autoinstall/master/nginx-autoinstall.sh
 chmod +x nginx-autoinstall.sh
 ./nginx-autoinstall.sh
 ```
 
-You can check [configuration examples](https://github.com/Angristan/nginx-autoinstall/tree/master/conf) for the custom modules.
+You can check [configuration examples](https://github.com/intsez/nginx-autoinstall/tree/master/conf) for the custom modules.
 
 ## Uninstall Nginx
 
