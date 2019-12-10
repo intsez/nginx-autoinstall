@@ -130,7 +130,7 @@ case $OPTION in
 			while [[ $NAXSI != "y" && $NAXSI != "n" ]]; do
 				read -p "       NAXSI $NAXSI_VER [y/n]: " -e NAXSI
 			done
-			while [[ $NAXSI_F2B != "y" ]]; do
+			while [[ $NAXSI_F2B != "y" && $NAXSI_F2B != "n" ]]; do
 				read -p "       Integrate NAXSI with fail2ban [y/n]?: " -e NAXSI_F2B
 			done
 			while [[ $MODSEC != "y" && $MODSEC != "n" ]]; do
